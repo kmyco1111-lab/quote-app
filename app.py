@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="雲端廠商報價查詢系統", layout="wide")
 st.title("🌐 雲端廠商報價查詢系統")
 
-# 2. 定義資料讀取函式 (連結你的 Google Sheets)
+# 2. 定義資料讀取函式 (連結 Google Sheets)
 @st.cache_data(ttl=300)  # 每 5 分鐘自動失效，強制抓取雲端最新資料
 def load_data():
     # 這是你提供的 Google Sheets 連結
@@ -17,6 +17,9 @@ def load_data():
     try:
         # 直接從雲端讀取資料
         df = pd.read_csv(csv_url)
+        
+        # 【修正 1】自動移除欄位名稱前後的空白 (避免 '項目 ' 導致讀取錯誤)
+        df.columns = df.columns.str.strip()
         
         # 資料清理：確保金額與數量是數字，並處理掉可能存在的逗號
         for col in ["金額", "數量"]:
@@ -49,7 +52,8 @@ if df is not None:
     st.sidebar.header("🔍 搜尋條件")
     
     # 廠商下拉選單 (自動去重並排序)
-    vendor_list = ["全部"] + sorted(list(df["廠商"].dropna().unique()))
+    # 確保廠商欄位沒有空白值，避免報錯
+    vendor_list = ["全部"] + sorted(list(df["廠商"].dropna().astype(str).unique()))
     selected_vendor = st.sidebar.selectbox("篩選廠商", vendor_list)
     
     # 項目搜尋
@@ -57,10 +61,15 @@ if df is not None:
 
     # --- 過濾邏輯 ---
     display_df = df.copy()
+    
+    # 1. 廠商篩選
     if selected_vendor != "全部":
         display_df = display_df[display_df["廠商"] == selected_vendor]
+    
+    # 2. 關鍵字搜尋 【主要修正處】
     if search_query:
-        display_df = display_df[display_df["項目"].astype(str).str.contains(search_query, na=False)]
+        # case=False 代表忽略大小寫 (搜尋 'aws' 也能找到 'AWS')
+        display_df = display_df[display_df["項目"].astype(str).str.contains(search_query, case=False, na=False)]
 
     # --- 核心功能：自動排序 (低價在前) ---
     display_df = display_df.sort_values(by="單價", ascending=True)
@@ -80,9 +89,9 @@ if df is not None:
             use_container_width=True,
             hide_index=True
         )
-        st.info("💡 資料來源：Google Sheets。若在 Excel 修改後，請等待幾分鐘或重新整頁面。")
+        st.info("💡 資料來源：Google Sheets。若在 Excel 修改後，請等待幾分鐘或點擊左側「立即同步」按鈕。")
     else:
-        st.warning("查無符合條件的報價資料。")
+        st.warning("查無符合條件的報價資料。請嘗試其他關鍵字或清除篩選條件。")
 
     # 手動重新整理按鈕
     if st.sidebar.button("立即同步雲端資料"):

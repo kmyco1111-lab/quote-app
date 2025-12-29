@@ -66,10 +66,12 @@ if df is not None:
     if selected_vendor != "全部":
         display_df = display_df[display_df["廠商"] == selected_vendor]
     
-    # 2. 關鍵字搜尋 【主要修正處】
+# 2. 關鍵字搜尋 (強效版：強制轉小寫後比對)
     if search_query:
-        # case=False 代表忽略大小寫 (搜尋 'aws' 也能找到 'AWS')
-        display_df = display_df[display_df["項目"].astype(str).str.contains(search_query, case=False, na=False)]
+        # 移除搜尋詞兩端空格並轉小寫
+        q = search_query.strip().lower()
+        # 強制將資料欄位轉小寫後進行關鍵字比對
+        display_df = display_df[display_df["項目"].astype(str).str.lower().str.contains(q, na=False)]
 
     # --- 核心功能：自動排序 (低價在前) ---
     display_df = display_df.sort_values(by="單價", ascending=True)
@@ -97,3 +99,4 @@ if df is not None:
     if st.sidebar.button("立即同步雲端資料"):
         st.cache_data.clear()
         st.rerun()
+
